@@ -1,18 +1,18 @@
 /*
 * USB HOST SHIELD PINS
-   D7 - D13
-   RES
-   VIN
-   GND
-* TMP36 PINS
-   A0
-   3.3V
-   AREF
-   GND
-* LCD PINS:
-   D2-D6
-   A1
-*/
+ D7 - D13
+ RES
+ VIN
+ GND
+ * TMP36 PINS
+ A0
+ 3.3V
+ AREF
+ GND
+ * LCD PINS:
+ D2-D6
+ A1
+ */
 /*
  Relays on PIC board:
  1 - White (HEATING)
@@ -36,6 +36,8 @@
 
 #include <LiquidCrystal.h>
 #include "FTDIAsync.h"
+#include "pgmStatics.h"
+#include "pgmStrings.h"
 
 #define DEBUG_USB_HOST 0
 
@@ -44,28 +46,15 @@ USB              Usb;
 //USBHub         Hub(&Usb);
 FTDIAsync        FtdiAsync;
 FTDI             Ftdi(&Usb, &FtdiAsync);
-// USBHost Reset Pin
-#define USB_RST_dPIN 7
 
-// TMP36 GLOBALS
-#define TMP36_aPIN 0                //the resolution is 10 mV / degree centigrade 
-//(500 mV offset) to make negative temperatures an option
-#define aref_voltage_33 3.3         // we tie 3.3V to ARef and measure it with a multimeter!
-#define aref_voltage_50 5.0         // we tie 3.3V to ARef and measure it with a multimeter!
-
-double degreeCorrectionF = 0.0;
-double DESIRED_TEMP=72.0;
-boolean tooHot= false, wayHot = false, tooCold = false, wayCold = false, justRight=false;
-float tempF=0, tempC=0;
 unsigned long uptime = 0;
+double degreeCorrectionF = 0.0, tempF=0.0, tempC=0.0;
+boolean relays[16], haveRestored = false, userChanged = false, tooHot= false, tooCold = false, justRight=false;
 
 enum THERMOSTAT_STATES {
   OFF, COOL, HEAT, FAN};
 
 THERMOSTAT_STATES last_thermostat_state = OFF, curr_thermostat_state = OFF, user_thermostat_state = OFF;
-
-boolean relays[16];
-boolean haveRestored = false, userChanged = false;
 
 uint8_t intbuffer2[ 12 ] = { 
   0x00         };
@@ -74,8 +63,8 @@ uint8_t buf[ 64 ] = {
 uint8_t  rcode = 0;
 
 // LCD GLOBALS
-char strbuf[6]; // holds the ascii for the command
-char intbuffer[2]; // holds the ascii for an integer
+uint8_t strbuf[6]; // holds the ascii for the command
+uint8_t intbuffer[2]; // holds the ascii for an integer
 
 enum LCD_STATES { 
   LCD_OFF, LCD_ON, CLEAR, WELCOME, UPTIME, TEMP, STATUS, CUSTOM };
@@ -84,68 +73,6 @@ LCD_STATES curr_lcd_state = STATUS, last_lcd_state = LCD_OFF;
 
 // initialize the library with the numbers of the interface pins
 LiquidCrystal lcd(A1, 2, 3, 4, 5, 6);
-#define LCD_BL_EN_PIN A5
-
-// make some custom characters:
-byte degree[8] = {
-  0b11100,
-  0b10100,
-  0b11100,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b00000
-};
-uint8_t degreeChar = 0;
-
-byte smiley[8] = {
-  0b00000,
-  0b00000,
-  0b01010,
-  0b00000,
-  0b00000,
-  0b10001,
-  0b01110,
-  0b00000
-};
-uint8_t smileyChar = 1;
-
-byte frownie[8] = {
-  0b00000,
-  0b00000,
-  0b01010,
-  0b00000,
-  0b00000,
-  0b00000,
-  0b01110,
-  0b10001
-};
-uint8_t frownieChar = 2;
-
-byte relayON[8] = {
-  0b00100,
-  0b01110,
-  0b10101,
-  0b00100,
-  0b00100,
-  0b00100,
-  0b00100,
-  0b00100
-};
-uint8_t relayONChar = 3;
-
-byte relayOFF[8] = {
-  0b00100,
-  0b00100,
-  0b00100,
-  0b00100,
-  0b00100,
-  0b10101,
-  0b01110,
-  0b00100
-};
-uint8_t relayOFFChar = 4;
 
 void setup()
 {
@@ -175,13 +102,13 @@ void setup()
   Serial.begin( 115200 );  
 
   if (Usb.Init() == -1){
-    Serial.println("OSC did not start.");
+    Serial.println(OSC_Error_str);
     while(1); //halt
   }//if (Usb.Init() == -1...
 
   delay( 200 );
 
-  Serial.println("Started! Type '?' for help.");
+  Serial.println(Init_str);
 }
 
 void loop()
@@ -190,7 +117,7 @@ void loop()
 
   // Process any incoming Serial messages
   uint8_t userCommand[64] = { 
-    0x00                            }; //buffer to hold the message coming in from Serial
+    0x00                                }; //buffer to hold the message coming in from Serial
   int len=0;
   while (Serial.available() && len<64) {
     // read in one character at a time
@@ -212,10 +139,10 @@ void loop()
       switch((char)userCommand[0]) {
       case 'u': // send out arduino uptime
         // write to Serial
-        Serial.print("Uptime: ");
+        Serial.print(Uptime_str);
         ultoa( millis()/1000, (char *)intbuffer, 10 );
         Serial.print((char *)intbuffer);
-        Serial.println(" seconds elapsed");
+        Serial.println(Uptime_Seconds_Elapsed_str);
         // write to LCD
         printUptimetoLCD((char *)intbuffer);
         // set up refresh
@@ -247,64 +174,62 @@ void loop()
         user_thermostat_state = OFF;
         break;
       case 'S':
-        Serial.println("Relay Statuses:\r\n---------");
+        Serial.println(Relay_Statuses_str);
         for(int o = 0; o<16; o++) {
           Serial.print(o+1);
-          Serial.print(": ");
+          Serial.print(Colon_Space_str);
           Serial.println(relays[o]);
         }
-        Serial.println("=========");
-        Serial.println("States:\r\n---------");
-        Serial.print("curr: ");
+        Serial.println(Equals_line_str);
+        Serial.println(Thermostat_States_str);
+        Serial.print(Thermostat_States_Curr_str);
         Serial.println(curr_thermostat_state);
-        Serial.print("last: ");
+        Serial.print(Thermostat_States_Last_str);
         Serial.println(last_thermostat_state);
-        Serial.print("user: ");
+        Serial.print(Thermostat_States_User_str);
         Serial.println(user_thermostat_state);
-        Serial.print("tooHot: ");
+        Serial.print(Thermostat_States_TooHot_str);
         Serial.println(tooHot);
-        Serial.print("wayHot: ");
-        Serial.println(wayHot);
-        Serial.print("tooCold: ");
+        Serial.print(Thermostat_States_JustRight_str);
+        Serial.println(justRight);
+        Serial.print(Thermostat_States_TooCold_str);
         Serial.println(tooCold);
-        Serial.print("wayCold: ");
-        Serial.println(wayCold);
-        Serial.print("Desired Temp: ");
+        Serial.print(Thermostat_States_Desired_str);
         Serial.println(DESIRED_TEMP + degreeCorrectionF);
-        Serial.print("userChanged: ");
+        Serial.print(Thermostat_States_UserChanged_str);
         Serial.println(userChanged);
-        Serial.print("haveRestored: ");
+        Serial.print(Thermostat_States_HaveRestored_str);
         Serial.println(haveRestored);
-        Serial.println("=========");
+        Serial.println(Equals_line_str);
         curr_lcd_state = STATUS;
         break;
       case '+':      
         degreeCorrectionF += 0.5;
-        Serial.print("Desired Temp: ");
+        Serial.print(Thermostat_States_Desired_str);
         Serial.println(DESIRED_TEMP + degreeCorrectionF);
         break;
       case '-':
         degreeCorrectionF -= 0.5;
-        Serial.print("Desired Temp: ");
+        Serial.print(Thermostat_States_Desired_str);
         Serial.println(DESIRED_TEMP + degreeCorrectionF);
         break;
       case '?': // help menu
-        Serial.println("Welcome to Help Menu for Arduino Thermostat");        
-        Serial.println("\t'?': This Help Menu");
-        Serial.println("\t'w': Show Welcome on LCD");
-        Serial.println("\t'l': Toggle LCD On/Off");        
-        Serial.println("\t'u': Arduino's Uptime on LCD");
-        Serial.println("\t't': Get current Temperature on LCD");        
-        Serial.println("\t'S': Get current HVAC status");
-        Serial.println("\t'+': Increase Desired Temperature by 0.5");
-        Serial.println("\t'-': Decrease Desired Temperature by 0.5");
-        Serial.println("\t'H': Turn the HEATER on (relays 1 and 3 on)");
-        Serial.println("\t'C': Turn the AC on (relays 2 and 3 on)");
-        Serial.println("\t'F': Turn the FAN on (relay 3 on)");
-        Serial.println("\t'O': Turn the HVAC off (all relays off)");
+        Serial.println(*HelpMenu_Title_str);        
+        Serial.println(HelpMenu_Question_str);
+        Serial.println(HelpMenu_w_str);
+        Serial.println(HelpMenu_l_str);        
+        Serial.println(HelpMenu_u_str);
+        Serial.println(HelpMenu_t_str);        
+        Serial.println(HelpMenu_S_str);
+        Serial.println(HelpMenu_Plus_str);
+        Serial.println(HelpMenu_Minus_str);
+        Serial.println(HelpMenu_H_str);
+        Serial.println(HelpMenu_C_str);
+        Serial.println(HelpMenu_F_str);
+        Serial.println(HelpMenu_O_str);
         break;
       case 'w':
-        Serial.println("Showing Welcome Banner");
+        Serial.println(Show_Welcome_str);
         curr_lcd_state = WELCOME;
         break;
       case 'l':
@@ -333,7 +258,7 @@ void loop()
 
 void turnLCDon() {
   if(digitalRead(LCD_BL_EN_PIN) == LOW) {
-    Serial.println("turning on LCD...");
+    Serial.println(LCD_On_str);
     lcd.display();
     digitalWrite(LCD_BL_EN_PIN, HIGH);
     //Serial.println("done!");
@@ -342,7 +267,7 @@ void turnLCDon() {
 
 void turnLCDoff() {
   if(digitalRead(LCD_BL_EN_PIN) == HIGH) {
-    Serial.println("turning off LCD...");
+    Serial.println(LCD_Off_str);
     lcd.noDisplay();
     digitalWrite(LCD_BL_EN_PIN, LOW);
     //Serial.println("done!");
@@ -370,9 +295,9 @@ void refreshScreen() {
       if(curr_lcd_state != last_lcd_state) {
         turnLCDon();        
         lcd.clear();
-        lcd.print("Welcome To:");
+        lcd.print(LCD_Welcome_str);
         lcd.setCursor(0,2);
-        lcd.print("ADK_term_test v2");
+        lcd.print(LCD_Welcome_PGM_NAME_str);
       }
       break;
     case UPTIME:
@@ -421,7 +346,7 @@ void refreshScreen() {
 
       //  set relays accordingly
       // get all the relays' statuses
-      TxRxFTDI("ask//");
+      TxRxFTDI(ASK_CMD_str);
 
       // sanity check... if any unknown relays are turned on... turn them all off
       boolean resetRelays = false;
@@ -447,76 +372,80 @@ void refreshScreen() {
         haveRestored = true;
       }
 
-      if(curr_thermostat_state != user_thermostat_state && !userChanged && last_thermostat_state != OFF) {
+      if(curr_thermostat_state != user_thermostat_state && !userChanged) {
         curr_thermostat_state = user_thermostat_state;
         userChanged = true;
       }
 
       tooHot = (tempF >= ((DESIRED_TEMP + degreeCorrectionF) + 1.0));
-      wayHot = (tempF >= ((DESIRED_TEMP + degreeCorrectionF) + 10.0));
       tooCold = (tempF <= ((DESIRED_TEMP + degreeCorrectionF) - 1.0));
-      wayCold = (tempF <= ((DESIRED_TEMP + degreeCorrectionF) - 10.0));
-      justRight = ((tempF <= (DESIRED_TEMP + degreeCorrectionF) + 1.0) && tempF >= ((DESIRED_TEMP + degreeCorrectionF) - 1.0));
+      justRight = ((tempF < (DESIRED_TEMP + degreeCorrectionF) + 1.0) && tempF > ((DESIRED_TEMP + degreeCorrectionF) - 1.0));
 
       if(curr_thermostat_state != last_thermostat_state || (tooHot || tooCold || justRight || userChanged)) {
-        Serial.print("...");
-        Serial.print(last_thermostat_state);
-        Serial.print(curr_thermostat_state);
-        Serial.print(user_thermostat_state);
-        Serial.println(userChanged);
+        /*Serial.print("...");
+         Serial.print(last_thermostat_state);
+         Serial.print(curr_thermostat_state);
+         Serial.print(user_thermostat_state);
+         Serial.println(userChanged);*/
         switch(curr_thermostat_state) {
         case COOL:
           // turn AC on if current mode is COOL and we weren't already in COOL mode and it's tooHot
           //Serial.println("COOL?");
-          if(curr_thermostat_state != last_thermostat_state && (tooHot || wayHot)) {
-            Serial.println("COOL!");
-            if(relays[0]) TxRxFTDI("01-//");
-            if(!relays[1]) TxRxFTDI("02+//");
-            if(!relays[2]) TxRxFTDI("03+//");
+          if(curr_thermostat_state != last_thermostat_state && tooHot) {
+            //Serial.println("COOL!");
+            if(relays[0]) TxRxFTDI(R1_OFF_CMD_str);
+            if(!relays[1]) TxRxFTDI(R2_ON_CMD_str);
+            if(!relays[2]) TxRxFTDI(R3_ON_CMD_str);
           }
           // turn mode to OFF if we were cooling and it's tooCold(implied) or userChanged(implied)
-          else if(last_thermostat_state != OFF && curr_thermostat_state != last_thermostat_state) {
-            //Serial.println(".");
+          else if(last_thermostat_state != OFF && tooCold) {
+            //Serial.println("cOFF!");
             curr_thermostat_state = OFF;
-            TxRxFTDI("off//");
+            TxRxFTDI(OFF_CMD_str);
             return;
+          }
+          else if (tooCold) {
+            //Serial.println("Coff!");
+            curr_thermostat_state = OFF;
           }
           break;
         case HEAT:
           // turn HEATER on if current mode is HEAT and we weren't already in HEAT mode and it's tooCold
           //Serial.println("HEAT?");
-          if (curr_thermostat_state != last_thermostat_state && (tooCold || wayCold)){                        
-            Serial.println("HEAT!");
-            if(relays[1]) TxRxFTDI("02-//");
-            if(!relays[0]) TxRxFTDI("01+//");            
-            if(!relays[2]) TxRxFTDI("03+//");
+          if (curr_thermostat_state != last_thermostat_state && tooCold){
+            //Serial.println("HEAT!");
+            if(relays[1]) TxRxFTDI(R2_OFF_CMD_str);
+            if(!relays[0]) TxRxFTDI(R1_ON_CMD_str);            
+            if(!relays[2]) TxRxFTDI(R3_ON_CMD_str);
           }
           // turn mode to OFF if we were heating and it's tooHot(implied) or userChanged(implied)
-          else if(last_thermostat_state != OFF) {
-            //Serial.println("HEAT<");
+          else if(last_thermostat_state != OFF && tooHot) {
+            //Serial.println("hOFF!");
             curr_thermostat_state = OFF;
-            TxRxFTDI("off//");
+            TxRxFTDI(OFF_CMD_str);
             return;
+          } 
+          else if (tooHot) {
+            //Serial.println("Hoff!");
+            curr_thermostat_state = OFF;
           }
           break;
         case FAN:
           // turn FAN on if current mode is FAN and we weren't already in FAN mode
           //Serial.println("FAN?");
           if(curr_thermostat_state != last_thermostat_state) {
-            Serial.println("FAN!");
-            if(relays[0]) TxRxFTDI("01-//");
-            if(relays[1]) TxRxFTDI("02-//");
-            if(!relays[2]) TxRxFTDI("03+//");
+            //Serial.println("FAN!");
+            if(relays[0]) TxRxFTDI(R1_OFF_CMD_str);
+            if(relays[1]) TxRxFTDI(R2_OFF_CMD_str);
+            if(!relays[2]) TxRxFTDI(R3_ON_CMD_str);
           }
           break;
         case OFF:
           // turn OFF if current mode is OFF and we weren't already in OFF mode
           //Serial.println("OFF?");
           if(curr_thermostat_state != last_thermostat_state || userChanged) {
-            Serial.println("OFF!");
-            if(relays[0]) TxRxFTDI("01-//");
-            if(relays[1]) TxRxFTDI("02-//");
-            if(relays[2]) TxRxFTDI("03-//");
+            //Serial.println("OFF!");
+            TxRxFTDI(OFF_CMD_str);
           }
           break;
         }
@@ -525,12 +454,12 @@ void refreshScreen() {
       } // end if(curr_thermostat_state != last_thermostat_state)
 
       // logic to automatically switch on AC or HEAT in case system is currently OFF
-      // AUTOMATICALLY turn on COOL if  tooHot and user had selected COOL, or wayHot and we were OFF
-      if((tooHot && user_thermostat_state == COOL)  || (wayHot && user_thermostat_state == OFF)) {
+      // AUTOMATICALLY turn on COOL if  tooHot and user had selected COOL
+      if(tooHot && user_thermostat_state == COOL && !justRight) {
         curr_thermostat_state = COOL;
       }
-      // AUTOMATICALLY turn on HEAT if tooCold and user had selected HEAT, or wayCold and we were OFF
-      if ((tooCold && user_thermostat_state == HEAT) || (wayCold && user_thermostat_state == OFF)) {
+      // AUTOMATICALLY turn on HEAT if tooCold and user had selected HEAT
+      if(tooCold && user_thermostat_state == HEAT && !justRight) {
         //user_thermostat_state = HEAT;
         curr_thermostat_state = HEAT;
       }
@@ -550,7 +479,7 @@ void refreshScreen() {
   } // if uptime is divisible by 1000 millis, update the screen
 }
 
-void TxRxFTDI(char strbuf[]) {
+void TxRxFTDI(const char strbuf[]) {
   //char strbuf[] = "off//";
   //Serial.print("Sending: ");
   //Serial.println(strbuf);
@@ -578,7 +507,7 @@ void TxRxFTDI(char strbuf[]) {
   }
   delay(15);
 
-  if(strbuf == "ask//") {
+  if(strbuf == ASK_CMD_str) {
     //Serial.println("received relay status!");
     char* buffer = ((char*)(buf+2));
     /*Serial.println((buffer[0] & 0x01) >> 0);
@@ -669,11 +598,11 @@ void printStatustoLCD() {
 
 void printTemptoLCD() {
   lcd.clear();
-  lcd.print("Temperature:");
+  lcd.print(LCD_Temperature_str);
   lcd.setCursor(0,2);
   lcd.print(tempF);
   lcd.write(degreeChar);
-  lcd.print(" F ");
+  lcd.print(LCD_Temperature_F_str);
 
   // if we're set to COOL and !tooHot or set to HEAT and !tooCold and justRight
   if((!tooHot && user_thermostat_state == COOL) || (!tooCold && user_thermostat_state == HEAT) || (justRight && user_thermostat_state == OFF) || (justRight && user_thermostat_state == FAN)) {
@@ -687,10 +616,10 @@ void printTemptoLCD() {
 void printUptimetoLCD(char* intbuffer) {
   // write to LCD
   lcd.clear();
-  lcd.print("Uptime:");
+  lcd.print(Uptime_str);
   lcd.setCursor(0,2);
   lcd.print(intbuffer);
-  lcd.print(" seconds");
+  lcd.print(Uptime_Seconds_str);
 }
 
 /*
@@ -701,6 +630,8 @@ float getVoltage(int pin){
   return (analogRead(pin) * aref_voltage_33 / 1024.0); //converting from a 0 to 1023 digital range
   // to 0 to 5 volts (each 1 reading equals ~ 5 millivolts
 }
+
+
 
 
 
