@@ -1,7 +1,9 @@
 Arduino-Thermostat
 ==================
 
-Arduino UNO with a USB Host Shield and 16x2 LCD from SparkFun plugged into a PIC/relay board from Denkovi controlling relays over FTDI USB->Serial link
+Arduino UNO with a USB Host Shield, a 16x2 LCD, and a TMP36 Temperature Sensor from SparkFun plugged into a PIC/relay board from Denkovi controlling relays over FTDI USB->Serial link
+
+TMP36 Sensor: https://www.sparkfun.com/products/10988
 
 16x2 LCD: https://www.sparkfun.com/products/709
 
