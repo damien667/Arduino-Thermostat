@@ -9,4 +9,6 @@ TMP36 Sensor: https://www.sparkfun.com/products/10988
 
 USB Host Shield: https://www.sparkfun.com/products/9947
 
+USB Host Shield Library from here: https://github.com/felis/USB_Host_Shield_2.0.git
+
 The PIC board being used is this one: http://denkovi.com/productv/33/usb-16-channel-relay-module-rs232-controlled-12v-ver-2.html
