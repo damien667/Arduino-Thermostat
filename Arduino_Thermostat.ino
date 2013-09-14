@@ -203,6 +203,8 @@ void loop()
         Serial.println(tooCold);
         Serial.print(getPGMString(&Thermostat_States_Desired_str));
         Serial.println(DESIRED_TEMP + degreeCorrectionF);
+        Serial.print(getPGMString(&LCD_Temperature_str));
+        Serial.println(tempF);
         Serial.print(getPGMString(&Thermostat_States_UserChanged_str));
         Serial.println(userChanged);
         Serial.print(getPGMString(&Thermostat_States_HaveRestored_str));
@@ -482,6 +484,11 @@ void refreshScreen() {
     else {
       // reset our global for next USB connection
       haveRestored = false;
+      last_thermostat_state = OFF;
+      curr_thermostat_state = OFF;
+      for(int i = 0; i<16; i++) {
+        relays[i] = false;
+      }
     }
   } // if uptime is divisible by 1000 millis, update the screen
 }
