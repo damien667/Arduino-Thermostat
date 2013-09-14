@@ -124,7 +124,7 @@ void loop()
 
   // Process any incoming Serial messages
   uint8_t userCommand[64] = { 
-    0x00                                    }; //buffer to hold the message coming in from Serial
+    0x00                                      }; //buffer to hold the message coming in from Serial
   int len=0;
   while (Serial.available() && len<64) {
     // read in one character at a time
@@ -363,7 +363,7 @@ void refreshScreen() {
         }
       }
       if(resetRelays) {
-        TxRxFTDI("off//");
+        TxRxFTDI(getPGMString(&OFF_CMD_str));
       }
 
       // sanity check in case the Arduino was reset or unplugged from PIC and the current relay state is to be restored
@@ -400,9 +400,9 @@ void refreshScreen() {
           //Serial.println("COOL?");
           if(curr_thermostat_state != last_thermostat_state && tooHot) {
             //Serial.println("COOL!");
-            if(relays[0]) TxRxFTDI(getPGMString(&R1_OFF_CMD_str));
-            if(!relays[1]) TxRxFTDI(getPGMString(&R2_ON_CMD_str));
-            if(!relays[2]) TxRxFTDI(getPGMString(&R3_ON_CMD_str));
+            TxRxFTDI(getPGMString(&R1_OFF_CMD_str));
+            TxRxFTDI(getPGMString(&R2_ON_CMD_str));
+            TxRxFTDI(getPGMString(&R3_ON_CMD_str));
           }
           // turn mode to OFF if we were cooling and it's tooCold(implied) or userChanged(implied)
           else if(last_thermostat_state != OFF && tooCold) {
@@ -421,9 +421,9 @@ void refreshScreen() {
           //Serial.println("HEAT?");
           if (curr_thermostat_state != last_thermostat_state && tooCold){
             //Serial.println("HEAT!");
-            if(relays[1]) TxRxFTDI(getPGMString(&R2_OFF_CMD_str));
-            if(!relays[0]) TxRxFTDI(getPGMString(&R1_ON_CMD_str));            
-            if(!relays[2]) TxRxFTDI(getPGMString(&R3_ON_CMD_str));
+            TxRxFTDI(getPGMString(&R2_OFF_CMD_str));
+            TxRxFTDI(getPGMString(&R1_ON_CMD_str));            
+            TxRxFTDI(getPGMString(&R3_ON_CMD_str));
           }
           // turn mode to OFF if we were heating and it's tooHot(implied) or userChanged(implied)
           else if(last_thermostat_state != OFF && tooHot) {
@@ -508,13 +508,15 @@ void TxRxFTDI(const char strbuf[]) {
 
   // The device reserves the first two bytes of data
   //   to contain the current values of the modem and line status registers.
-  if (rcvd > 2) {
+  //if (rcvd > 2) {
+    //Serial.print("For: ");
+    //Serial.println(strbuf);
     //Serial.print("Receiving: ");
-    //Serial.println((char*)(buf+2));
-  }
-  delay(15);
+    //Serial.println((char*)(buf+2));    
+  //}
+  //delay(15);
 
-  if(strbuf == getPGMString(&ASK_CMD_str)) {
+  if(strcmp(strbuf, "ask//")  == 0) {
     //Serial.println("received relay status!");
     char* buffer = ((char*)(buf+2));
     /*Serial.println((buffer[0] & 0x01) >> 0);
@@ -533,7 +535,7 @@ void TxRxFTDI(const char strbuf[]) {
      Serial.println((buffer[1] & 0x20) >> 5);
      Serial.println((buffer[1] & 0x40) >> 6);
      Serial.println((buffer[1] & 0x80) >> 7);*/
-
+    
     int o=0;
     for(int m = 7; m >=0; m--) {
       int pos = 1;
@@ -542,7 +544,7 @@ void TxRxFTDI(const char strbuf[]) {
       }
       relays[o] = (( (buffer[0] & pos) >> m) == 0x01 ? true : false);
       o++;
-    }    
+    }
     for(int m = 15; m >=8; m--) {
       int pos = 1;
       for(int n = (m-8); n > 0 ; n--) {
@@ -551,7 +553,6 @@ void TxRxFTDI(const char strbuf[]) {
       relays[o] = (( (buffer[1] & pos) >> (m-8)) == 0x01 ? true : false);
       o++;
     }
-
   }// end if(strbuf == "ask//")
 }
 
@@ -637,6 +638,7 @@ float getVoltage(int pin){
   return (analogRead(pin) * aref_voltage_33 / 1024.0); //converting from a 0 to 1023 digital range
   // to 0 to 5 volts (each 1 reading equals ~ 5 millivolts
 }
+
 
 
 
