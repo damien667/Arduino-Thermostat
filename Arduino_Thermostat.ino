@@ -43,24 +43,24 @@
 
 // USBHost globals
 USB              Usb;
-//USBHub         Hub(&Usb);
 FTDIAsync        FtdiAsync;
 FTDI             Ftdi(&Usb, &FtdiAsync);
 
 unsigned long uptime = 0;
 double degreeCorrectionF = 0.0, tempF=0.0, tempC=0.0;
 boolean relays[16], haveRestored = false, userChanged = false, tooHot= false, tooCold = false, justRight=false;
-//char pgm_buffer[80];
 
 enum THERMOSTAT_STATES {
   OFF, COOL, HEAT, FAN};
 
 THERMOSTAT_STATES last_thermostat_state = OFF, curr_thermostat_state = OFF, user_thermostat_state = OFF;
 
+//buffer to convert int to ASCII
 uint8_t intbuffer2[ 12 ] = { 
-  0x00         };
+  0x00 };
+//buffer to convert unsigned long to ASCII, and to hold uptime
 uint8_t buf[ 64 ] = { 
-  0x00                 }; //buffer to convert unsigned long to ASCII, and to hold uptime
+  0x00 };
 uint8_t  rcode = 0;
 
 // LCD GLOBALS
@@ -108,7 +108,7 @@ void setup()
   }//if (Usb.Init() == -1...
 
   delay( 200 );
-    
+
   Serial.println(getPGMString(&Init_str));
 }
 
@@ -124,7 +124,7 @@ void loop()
 
   // Process any incoming Serial messages
   uint8_t userCommand[64] = { 
-    0x00                                }; //buffer to hold the message coming in from Serial
+    0x00                                    }; //buffer to hold the message coming in from Serial
   int len=0;
   while (Serial.available() && len<64) {
     // read in one character at a time
@@ -637,6 +637,8 @@ float getVoltage(int pin){
   return (analogRead(pin) * aref_voltage_33 / 1024.0); //converting from a 0 to 1023 digital range
   // to 0 to 5 volts (each 1 reading equals ~ 5 millivolts
 }
+
+
 
 
 
