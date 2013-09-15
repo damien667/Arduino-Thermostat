@@ -123,27 +123,32 @@ void loop()
   Usb.Task();
 
   // Process any incoming Serial messages
-  uint8_t userCommand[64] = { 
-    0x00                                      }; //buffer to hold the message coming in from Serial
-  int len=0;
-  while (Serial.available() && len<64) {
-    // read in one character at a time
-    userCommand[len] = (char)Serial.read();
-    len++;
-    delay(1);
+  //uint8_t userCommand[64] = { 
+  //  0x00                                      }; //buffer to hold the message coming in from Serial
+  //int len=0;
+  //while (Serial.available() && len<64) {
+  // read in one character at a time
+  //userCommand[len] = (char)Serial.read();
+  //len++;
+  //delay(1);
+  //}
+  uint8_t userCommand = 0x00;
+  int len = 0;
+  if(Serial.available()) {
+    userCommand = (char)Serial.read();
+    len = 1;
   }
-
   if(len > 0) {    
-    for( uint8_t l = 0; l < len; l++ ) {
-      Serial.print((char)userCommand[l]);
-    }
-    Serial.println("");
+    //for( uint8_t l = 0; l < len; l++ ) {
+    Serial.println((char)userCommand);
+    //}
+    //Serial.println("");
 
     if(len == 1) { //one character was sent {char,\n}
 
 
       // execute command that was called
-      switch((char)userCommand[0]) {
+      switch((char)userCommand) {
       case 'u': // send out arduino uptime
         // write to Serial
         Serial.print(getPGMString(&Uptime_str));
@@ -255,9 +260,9 @@ void loop()
     }
     else if (len >= 2) { // if message received is larger than 2, it's a custom message
       lcd.clear();
-      for( uint8_t l = 0; l < len; l++ ) {
-        lcd.print((char)userCommand[l]);
-      }
+      //for( uint8_t l = 0; l < len; l++ ) {
+        lcd.print((char)userCommand);
+      //}
       curr_lcd_state = CUSTOM;
     } //end if len == 1
   } // end if len > 0
@@ -516,10 +521,10 @@ void TxRxFTDI(const char strbuf[]) {
   // The device reserves the first two bytes of data
   //   to contain the current values of the modem and line status registers.
   //if (rcvd > 2) {
-    //Serial.print("For: ");
-    //Serial.println(strbuf);
-    //Serial.print("Receiving: ");
-    //Serial.println((char*)(buf+2));    
+  //Serial.print("For: ");
+  //Serial.println(strbuf);
+  //Serial.print("Receiving: ");
+  //Serial.println((char*)(buf+2));    
   //}
   //delay(15);
 
@@ -542,7 +547,7 @@ void TxRxFTDI(const char strbuf[]) {
      Serial.println((buffer[1] & 0x20) >> 5);
      Serial.println((buffer[1] & 0x40) >> 6);
      Serial.println((buffer[1] & 0x80) >> 7);*/
-    
+
     int o=0;
     for(int m = 7; m >=0; m--) {
       int pos = 1;
@@ -645,6 +650,7 @@ float getVoltage(int pin){
   return (analogRead(pin) * aref_voltage_33 / 1024.0); //converting from a 0 to 1023 digital range
   // to 0 to 5 volts (each 1 reading equals ~ 5 millivolts
 }
+
 
 
 

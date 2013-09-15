@@ -18,3 +18,12 @@ USB Host Shield Library from here: https://github.com/felis/USB_Host_Shield_2.0.
 Note: Sparkfun USB Host Shield differs from Circuits@Home kind. Pin7 on Arduino UNO must be brought HIGH in order to bring max3421e online.
 
 The PIC board being used is this one: http://denkovi.com/productv/33/usb-16-channel-relay-module-rs232-controlled-12v-ver-2.html
+
+Android Arduino-ThermostatController
+====================================
+
+This is the companion Android application to use on Android devices that support USBHost mode to talk with Arduino over its USB->Serial CDC_ACM interface.
+
+It controls the Arduino-Thermostat without the need for a PC. Testing on Galaxy Nexus and Nexus 10 so far.
+
+It is accomplished with the help from this open source USB->Serial driver/library for the USBHost API's in Android: https://github.com/mik3y/usb-serial-for-android.git
