@@ -101,7 +101,7 @@ public class ControlActivity extends Activity {
 		// ioManager.setListener();
 		// runOnUiThread(ioManager);
 		if (ioManager != null) {
-			ioManager.writeAsync(new byte[] { 'S' });
+			ioManager.writeAsync(new byte[] { 's' });
 		}
 	}
 
@@ -171,7 +171,7 @@ public class ControlActivity extends Activity {
 		public void onClick(View v) {
 			AlertDialog.Builder b = new Builder(context);
 			b.setTitle("Set User State");
-			String[] types = { "COOL", "HEAT", "OFF" };
+			String[] types = { "COOL", "HEAT", "FAN", "OFF" };
 			b.setItems(types, new DialogInterface.OnClickListener() {
 
 				@Override
@@ -192,6 +192,11 @@ public class ControlActivity extends Activity {
 						break;
 					case 2:
 						if (ioManager != null) {
+							ioManager.writeAsync(new byte[] { 'F' });
+						}
+						break;
+					case 3:
+						if (ioManager != null) {
 							ioManager.writeAsync(new byte[] { 'O' });
 						}
 						break;
@@ -210,47 +215,26 @@ public class ControlActivity extends Activity {
 			try {
 				// Log.d(TAG, "data received!" + new String(data, "ASCII"));
 				buffer.put(data);
-				if (buffer.position() >= 314) { // first packet is 314(+3), all others are 314
-					// Log.d(TAG, "Received total data: " + buffer.position());
-					// parse the S response
-					HashMap<String, String> lines = new HashMap<String, String>();
-					int responseSize = buffer.position();
-					for (int i = 0; i < responseSize; i++) {
-						String line = "";
-						while ((char) buffer.get(i) != '\n' && i < responseSize - 1) {
-							if ((char) buffer.get(i) != '\r') {
-								line += (char) buffer.get(i);
-							}
-							i++;
-						}
-						int index = line.indexOf(":");
-						if (index != -1) {
-							String key = line.substring(0, index);
-							String value = null;
-							value = line.substring(index + 1, line.length()).trim();
-							if (!value.isEmpty()) {
-								lines.put(key, value);
-							}
-						}
-					}
-					// lines map: {last=1, userChanged=0, 15=0, 16=0, 13=0, tooCold=0, 14=0, 11=0, 12=0, Desired Temp=72.00, curr=1, Temperature=72.52, tooHot=0, haveRestored=1, 3=1, 2=1, 10=0, 1=0, justRight=1, 7=0, 6=0, 5=0, 4=0, 9=0, 8=0, user=1}
-					if (lines.size() == 26) {
-						ThermostatStatus status = new ThermostatStatus(lines);
-						Message m = new Message();
-						m.what = 101;
-						m.obj = status;
-						USBSerialHandler.sendMessage(m);
-						buffer.clear();
-						Thread.sleep(50);
-						ioManager.writeAsync(new byte[] { 'S' });
-					} else {
-						Log.e(TAG, "missing rx data!");
-						buffer.clear();
-						Thread.sleep(50);
-						ioManager.writeAsync(new byte[] { 'S' });
-					}
+				if (buffer.position() >= 64) { // data is 64 bytes (67 bytes first packet, 64 every packet after that)
+					Log.d(TAG, "Received total data: " + buffer.position());
+					// parse the s response
+					// it could be padded with "�\r\n", followed by "s\r\n", then the first byte of data arrives
+					String received = new String(buffer.array());
+					int start = received.indexOf('s') + 3; // find start of response (after "s\r\n" which is 3 bytes)
+					int end = buffer.position() - 2; // find end of response (truncate the last "\r\n")
+					String filtered = received.substring(start, end);
+					String[] values = filtered.split(",");
+					Log.d(TAG, "Received " + values.length + " values");
+					ThermostatStatus status = new ThermostatStatus(values);
+					Message m = new Message();
+					m.what = 101;
+					m.obj = status;
+					USBSerialHandler.sendMessage(m);
+					buffer.clear();
+					Thread.sleep(50);
+					ioManager.writeAsync(new byte[] { 's' });
 				}
-			} catch (InterruptedException e) {
+			} catch (Exception e) {
 				Log.e(TAG, e.getMessage());
 			}
 		}
@@ -345,55 +329,55 @@ public class ControlActivity extends Activity {
 	};
 
 	private class ThermostatStatus {
-		HashMap<String, String> status;
+		String[] status;
 
-		public ThermostatStatus(HashMap<String, String> status) {
+		public ThermostatStatus(String[] status) {
 			this.status = status;
 		}
 
+		// relays are first 16 Strings (0-15)
 		public boolean getRelayState(int relayNum) {
-			return (Integer.parseInt(status.get(String.valueOf(relayNum))) == 1);
+			return (Integer.parseInt(status[relayNum - 1]) == 1);
 		}
 
 		public boolean getTooHot() {
-			return (Integer.parseInt(status.get("tooHot")) == 1);
+			return (Integer.parseInt(status[19]) == 1);
 		}
 
 		public boolean getTooCold() {
-			return (Integer.parseInt(status.get("tooCold")) == 1);
+			return (Integer.parseInt(status[21]) == 1);
 		}
 
 		public boolean getJustRight() {
-			return (Integer.parseInt(status.get("justRight")) == 1);
+			return (Integer.parseInt(status[20]) == 1);
 		}
 
 		public boolean getUserChanged() {
-			return (Integer.parseInt(status.get("userChanged")) == 1);
+			return (Integer.parseInt(status[24]) == 1);
 		}
 
 		public boolean getHaveRestored() {
-			return (Integer.parseInt(status.get("haveRestored")) == 1);
+			return (Integer.parseInt(status[25]) == 1);
 		}
 
 		public THERMOSTAT_STATES getLastState() {
-
-			return THERMOSTAT_STATES.values()[Integer.parseInt(status.get("last"))];
+			return THERMOSTAT_STATES.values()[Integer.parseInt(status[17])];
 		}
 
 		public THERMOSTAT_STATES getCurrentState() {
-			return THERMOSTAT_STATES.values()[Integer.parseInt(status.get("curr"))];
+			return THERMOSTAT_STATES.values()[Integer.parseInt(status[16])];
 		}
 
 		public THERMOSTAT_STATES getUserState() {
-			return THERMOSTAT_STATES.values()[Integer.parseInt(status.get("user"))];
+			return THERMOSTAT_STATES.values()[Integer.parseInt(status[18])];
 		}
 
 		public float getCurrentTemp() {
-			return Float.valueOf(status.get("Temperature"));
+			return Float.valueOf(status[23]);
 		}
 
 		public float getDesiredTemp() {
-			return Float.valueOf(status.get("Desired Temp"));
+			return Float.valueOf(status[22]);
 		}
 	}
 }

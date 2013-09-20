@@ -75,6 +75,9 @@ const char *HelpMenu_u_str PROGMEM = HelpMenu_u_str_str;
 const char HelpMenu_t_str_str[] PROGMEM = "\t't': Get current Temperature on LCD";
 const char *HelpMenu_t_str PROGMEM = HelpMenu_t_str_str;
 
+const char HelpMenu_s_str_str[] PROGMEM = "\t's': Get current HVAC status(non-human)";
+const char *HelpMenu_s_str PROGMEM = HelpMenu_s_str_str;
+
 const char HelpMenu_S_str_str[] PROGMEM = "\t'S': Get current HVAC status";
 const char *HelpMenu_S_str PROGMEM = HelpMenu_S_str_str;
 
@@ -140,6 +143,9 @@ const char *LCD_Temperature_str PROGMEM = LCD_Temperature_str_str;
 
 const char LCD_Temperature_F_str_str[] PROGMEM = " F ";
 const char *LCD_Temperature_F_str PROGMEM = LCD_Temperature_F_str_str;
+
+const char Serial_Comma_Separator_str_str[] PROGMEM = ",";
+const char *Serial_Comma_Separator_str PROGMEM = Serial_Comma_Separator_str_str;
 
 #endif // __PGMSTRINGS_H__
 

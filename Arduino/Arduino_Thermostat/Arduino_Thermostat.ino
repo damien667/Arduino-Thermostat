@@ -217,6 +217,32 @@ void loop()
         Serial.println(getPGMString(&Equals_line_str));
         curr_lcd_state = STATUS;
         break;
+      case 's': // serial data only, non-human readable, single line comma separated
+        for(int o = 0; o<16; o++) {
+          Serial.print(relays[o]);
+          Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        }
+        Serial.print(curr_thermostat_state);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(last_thermostat_state);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(user_thermostat_state);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(tooHot);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(justRight);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(tooCold);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(DESIRED_TEMP + degreeCorrectionF);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(tempF);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(userChanged);
+        Serial.print(getPGMString(&Serial_Comma_Separator_str));
+        Serial.print(haveRestored);
+        Serial.println();
+        break;
       case '+':      
         degreeCorrectionF += 0.5;
         Serial.print(getPGMString(&Thermostat_States_Desired_str));
@@ -233,7 +259,8 @@ void loop()
         Serial.println(getPGMString(&HelpMenu_w_str));
         Serial.println(getPGMString(&HelpMenu_l_str));        
         Serial.println(getPGMString(&HelpMenu_u_str));
-        Serial.println(getPGMString(&HelpMenu_t_str));        
+        Serial.println(getPGMString(&HelpMenu_t_str));
+        Serial.println(getPGMString(&HelpMenu_s_str));
         Serial.println(getPGMString(&HelpMenu_S_str));
         Serial.println(getPGMString(&HelpMenu_Plus_str));
         Serial.println(getPGMString(&HelpMenu_Minus_str));
@@ -261,7 +288,7 @@ void loop()
     else if (len >= 2) { // if message received is larger than 2, it's a custom message
       lcd.clear();
       //for( uint8_t l = 0; l < len; l++ ) {
-        lcd.print((char)userCommand);
+      lcd.print((char)userCommand);
       //}
       curr_lcd_state = CUSTOM;
     } //end if len == 1
@@ -650,6 +677,9 @@ float getVoltage(int pin){
   return (analogRead(pin) * aref_voltage_33 / 1024.0); //converting from a 0 to 1023 digital range
   // to 0 to 5 volts (each 1 reading equals ~ 5 millivolts
 }
+
+
+
 
 
 
